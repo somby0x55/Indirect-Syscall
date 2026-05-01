@@ -26,8 +26,6 @@ void* banner() {
 
 int injector() {
 
-
-
 	int targetpid = 0;
 	int compareResult = 0;
 	PROCESSENTRY32 pe32;
@@ -97,8 +95,6 @@ int injector() {
 	} while (Process32Next(hProcessSnap, &pe32));
 	CloseHandle(hProcessSnap);
 
-
-	
 	if (targetpid != 0) {
 
 		clientID.UniqueProcess = (HANDLE)targetpid;
