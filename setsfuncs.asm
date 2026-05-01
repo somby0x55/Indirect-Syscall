@@ -1,37 +1,19 @@
+
 .data
-	extern NtOpenProcessSSN:DWORD
-	extern NtAllocateVirtualMemorySSN:DWORD
-	extern NtWriteVirtualMemorySSN:DWORD
-	extern NtCreateThreadExSSN:DWORD
+	variableSSN DWORD 0h
 
 .code
 
-	NtOpenProcess proc
+	setFunction proc
+		mov variableSSN, ecx
+		ret
+	setFunction endp
+
+	patchedFunction proc
 		mov r10, rcx
-		mov eax, NtOpenProcessSSN
+		mov eax, variableSSN
 		syscall
 		ret
-	NtOpenProcess endp
+	patchedFunction endp
 
-	NtAllocateVirtualMemory proc
-		mov r10, rcx
-		mov eax, NtAllocateVirtualMemorySSN
-		syscall 
-		ret
-	NtAllocateVirtualMemory endp
-
-	NtWriteVirtualMemory proc
-		mov r10, rcx
-		mov eax, NtWriteVirtualMemorySSN
-		syscall
-		ret
-	NtWriteVirtualMemory endp
-
-	NtCreateThreadEx proc
-		mov r10, rcx
-		mov eax, NtCreateThreadExSSN
-		syscall
-		ret
-	NtCreateThreadEx endp
-
-END
+end
