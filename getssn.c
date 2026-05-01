@@ -2,15 +2,17 @@
 #include <stdio.h>
 #include <Windows.h>
 
+void* patchFunc(char* targetDll, char* funcName) {
 
-void* GetSSN(HMODULE hNtdll, char* targetFuncName, PDWORD TargetFuncSSN) {
+	HMODULE hDll = GetModuleHandleA(targetDll);
+	UINT_PTR pFunc = (UINT_PTR)GetProcAddress(hDll, funcName);
+	DWORD funcSSN = ((PBYTE)(pFunc + 4))[0];
+	if (funcSSN == 0) {
+		printf("\n\n(!) Error getting SSN for %s: %lu\n", funcName, GetLastError());
+		return;
+	}
+	printf("\n(+) Found SSN successfully for %s: 0x%x", funcName, funcSSN);
+	setFunction(funcSSN);
 
-    UINT_PTR pTargetFunc = (UINT_PTR)GetProcAddress(hNtdll, targetFuncName);
-    *TargetFuncSSN = ((PBYTE)(pTargetFunc + 4))[0];
-    if (TargetFuncSSN == 0) {
-        printf("(!) Error getting SSN for %s: %lu\n", targetFuncName, GetLastError());
-        return 1;
-    }
-
-    return;
+	return;
 }
