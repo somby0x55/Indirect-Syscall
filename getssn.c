@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <Windows.h>
 
-UCHAR syscallOpcodes[2] = {0x0F, 0x05};
-
 int patchFunc(char* targetDll, char* funcName) {
 
 	UCHAR syscallOpcodes[2] = { 0x0F, 0x05 };
