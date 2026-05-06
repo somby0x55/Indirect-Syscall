@@ -20,7 +20,7 @@ void* banner() {
 	printf("         |   |           _____            \n");
 	printf("         |   |     ____-(     )_          \n");
 	printf("    __-nm'--mm----/      `--____)         \n");
-	printf("  //                                      \n\n\n");
+	printf("  //                                      \n");
 	return;
 }
 
